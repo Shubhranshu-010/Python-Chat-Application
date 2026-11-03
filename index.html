@@ -4,18 +4,24 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Python Web Chat</title>
+    <!-- Tailwind CSS for styling without writing CSS files -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
+        /* Custom Scrollbar for a sleek modern look */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        /* Simple fade animation for transitions */
         .fade-in { animation: fadeIn 0.2s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
 </head>
 <body class="bg-gray-100 h-screen w-screen overflow-hidden text-[#111b21] font-sans relative">
 
+    <!-- ============================================== -->
+    <!-- LOGIN SCREEN                                   -->
+    <!-- ============================================== -->
     <div id="login-screen" class="flex h-full w-full items-center justify-center bg-[#efeae2]">
         <div class="bg-white p-10 rounded-lg shadow-lg w-96 border border-gray-200 fade-in">
             <h1 class="text-3xl font-bold text-center mb-8 text-[#000000]">Python Chat</h1>
@@ -26,55 +32,77 @@
         </div>
     </div>
 
+    <!-- ============================================== -->
+    <!-- MAIN CHAT INTERFACE                            -->
+    <!-- ============================================== -->
     <div id="chat-screen" class="hidden h-full w-full flex bg-[#ffffff] fade-in">
         
+        <!-- --- LEFT SIDEBAR (CHANNELS & USERS) --- -->
         <div class="w-1/3 max-w-sm flex flex-col border-r border-gray-200">
+            <!-- Current User Profile Bar -->
             <div class="bg-[#f0f2f5] h-16 flex items-center px-4 border-b border-gray-200 shrink-0">
                 <div class="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center text-xl mr-3">👤</div>
                 <h2 id="my-username" class="text-lg font-bold">MyName</h2>
             </div>
             
             <div class="flex-1 overflow-y-auto bg-white">
+                <!-- Public Room -->
                 <h3 class="text-sm font-bold text-gray-500 px-4 pt-4 pb-2">CHANNELS</h3>
                 <div id="btn-ALL" onclick="switchChat('ALL')" class="chat-btn bg-[#efefef] px-4 py-3 cursor-pointer flex items-center border-b border-gray-100 hover:bg-gray-50 transition">
                     <div class="w-10 h-10 bg-[#00a884] text-white rounded-full flex items-center justify-center mr-3">🌎</div>
                     <span class="text-lg">Everyone (Public)</span>
                 </div>
                 
+                <!-- Custom Groups -->
                 <div class="flex justify-between items-center px-4 pt-6 pb-2">
                     <h3 class="text-sm font-bold text-gray-500">MY GROUPS</h3>
                     <button onclick="openGroupModal()" class="text-[#00a884] font-bold text-2xl hover:bg-gray-100 px-2 rounded-lg transition" title="Create Group">+</button>
                 </div>
                 <div id="groups-list"></div>
 
+                <!-- Direct Messages -->
                 <h3 class="text-sm font-bold text-gray-500 px-4 pt-6 pb-2">DIRECT MESSAGES</h3>
                 <div id="users-list"></div>
             </div>
         </div>
 
+        <!-- --- RIGHT SIDE (CHAT ROOM) --- -->
         <div class="flex-1 flex flex-col bg-[#efeae2] relative">
+            
+            <!-- Chat Header -->
             <div class="bg-[#f0f2f5] h-16 flex items-center justify-between px-6 border-b border-gray-200 shrink-0">
                 <h2 id="chat-title" class="text-xl font-bold">Everyone (Public)</h2>
+                <!-- Delete Group Button (Hidden by default, shown via JS if in a group) -->
                 <button id="delete-group-btn" onclick="requestDeleteGroup()" class="hidden text-red-500 hover:bg-red-100 px-3 py-1 rounded font-bold text-sm transition">🗑️ Delete/Leave Group</button>
             </div>
 
+            <!-- Messages Window (Where bubbles are injected) -->
             <div id="chat-box" class="flex-1 overflow-y-auto p-6 flex flex-col gap-2 relative"></div>
 
+            <!-- Typing Indicator Area -->
             <div id="typing-indicator" class="h-6 px-6 text-xs text-[#00a884] font-semibold italic bg-[#efeae2] hidden shrink-0">
                 Someone is typing...
             </div>
 
+            <!-- Emoji Picker Pop-up (Hidden by default) -->
             <div id="emoji-picker" class="hidden absolute bottom-[80px] left-4 bg-white border border-gray-200 rounded-lg shadow-xl p-3 grid grid-cols-6 gap-3 text-2xl z-40"></div>
 
+            <!-- Input Bar -->
             <div class="bg-[#f0f2f5] p-4 flex items-center gap-2 shrink-0 relative">
+                
+                <!-- Emoji Button -->
                 <button onclick="toggleEmojiPicker()" class="text-gray-500 hover:text-[#00a884] transition p-2 text-2xl" title="Add Emoji">🙂</button>
 
+                <!-- Hidden Image Upload input & Visible Paperclip Button -->
                 <input type="file" id="image-upload" accept="image/*" class="hidden" onchange="sendImage(this)">
                 <button id="attach-btn" onclick="document.getElementById('image-upload').click()" class="text-gray-500 hover:text-[#00a884] transition p-2 cursor-pointer" title="Attach Image">
                     <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5a2.5 2.5 0 0 1 5 0v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5a2.5 2.5 0 0 0 5 0V5c0-3.04-2.46-5.5-5.5-5.5S4 1.96 4 5v11.5c0 3.87 3.13 7 7 7s7-3.13 7-7V6h-1.5z"></path></svg>
                 </button>
 
+                <!-- Text Box -->
                 <input type="text" id="message-input" placeholder="Type a message" class="flex-1 bg-white px-5 py-3 rounded-full outline-none border border-gray-300 focus:border-[#00a884]" onkeypress="if(event.key === 'Enter') sendMessage()">
+                
+                <!-- Send Button -->
                 <button onclick="sendMessage()" class="bg-[#00a884] text-white w-12 h-12 rounded-full flex items-center justify-center hover:bg-[#008f6f] transition shadow-sm shrink-0">
                     <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path></svg>
                 </button>
@@ -82,12 +110,17 @@
         </div>
     </div>
 
-    <!-- MODALS -->
+    <!-- ============================================== -->
+    <!-- MODALS (Pop-up screens)                        -->
+    <!-- ============================================== -->
+    
+    <!-- Image Viewing Modal -->
     <div id="image-modal" class="hidden fixed inset-0 z-50 bg-black/90 flex items-center justify-center fade-in cursor-zoom-out" onclick="closeImageModal()">
         <span class="absolute top-5 right-8 text-white text-4xl cursor-pointer hover:text-gray-300">&times;</span>
         <img id="modal-image" class="max-w-[90%] max-h-[90vh] object-contain rounded shadow-2xl">
     </div>
 
+    <!-- Create Group Modal -->
     <div id="group-modal" class="hidden fixed inset-0 z-50 bg-black/60 flex items-center justify-center fade-in">
         <div class="bg-white p-6 rounded-lg w-96 shadow-xl">
             <h3 class="text-xl font-bold mb-4 text-gray-800">Create New Group</h3>
@@ -103,19 +136,24 @@
         </div>
     </div>
 
+    <!-- ============================================== -->
+    <!-- JAVASCRIPT LOGIC                               -->
+    <!-- ============================================== -->
     <script>
+        // State variables
         let ws = null;
         let myName = "";
         let currentChat = "ALL";
         const chatHistory = { "ALL": [] }; 
-        
         let onlineUsers = [];
         let myGroups = [];
         
+        // Typing indicator timers
         let intentionalDisconnect = false; 
         let typingTimer = null;
         const activeTypers = new Set(); 
 
+        // HTML Element lookups
         const loginScreen = document.getElementById('login-screen');
         const chatScreen = document.getElementById('chat-screen');
         const chatBox = document.getElementById('chat-box');
@@ -126,6 +164,7 @@
         const typingIndicator = document.getElementById('typing-indicator');
         const deleteGroupBtn = document.getElementById('delete-group-btn');
 
+        // --- EMOJI PICKER SETUP ---
         const emojiList = ['😀','😂','🤣','😍','🙏','👍','🔥','😊','🥰','😎','😢','😡','🎉','✨','💔','💯','🥳','👏'];
         const pickerDiv = document.getElementById('emoji-picker');
         emojiList.forEach(em => {
@@ -134,12 +173,14 @@
 
         function toggleEmojiPicker() { pickerDiv.classList.toggle('hidden'); }
         function addEmoji(emoji) { messageInput.value += emoji; pickerDiv.classList.add('hidden'); messageInput.focus(); }
+        // Hide emoji picker if clicked outside of it
         document.addEventListener('click', (e) => {
             if(!e.target.closest('#emoji-picker') && !e.target.closest('button[onclick="toggleEmojiPicker()"]')) {
                 pickerDiv.classList.add('hidden');
             }
         });
 
+        // --- CONNECTION & ROUTING ---
         function authenticate(action) {
             const user = document.getElementById('username').value.trim();
             const pass = document.getElementById('password').value;
@@ -149,6 +190,7 @@
             intentionalDisconnect = false;
 
             try { 
+                // Automatically connect via secure (wss://) or unsecure (ws://) based on cloud host
                 const wsProtocol = window.location.protocol === "https:" ? "wss://" : "ws://";
                 ws = new WebSocket(wsProtocol + window.location.host + "/ws"); 
             } catch(e) { return alert("Browser blocked the connection."); }
@@ -172,6 +214,7 @@
                         ws.close();
                     }
                 } 
+                // Route incoming events to the correct function
                 else if (data.type === "users") { onlineUsers = data.users.filter(u => u !== myName); updateUsersList(); }
                 else if (data.type === "groups_list") { myGroups = data.groups; renderGroupsList(); }
                 else if (data.type === "new_group") { if (!myGroups.includes(data.group_name)) { myGroups.push(data.group_name); renderGroupsList(); } }
@@ -185,6 +228,7 @@
             ws.onclose = () => { if (!intentionalDisconnect) { alert("Lost connection."); location.reload(); } };
         }
 
+        // --- GROUP LOGIC ---
         function requestDeleteGroup() {
             if (confirm(`Are you sure you want to Delete or Leave the group '${currentChat}'?`)) {
                 ws.send(JSON.stringify({ type: "delete_group", group_name: currentChat }));
@@ -192,7 +236,7 @@
         }
         function handleGroupDeleted(groupName) {
             myGroups = myGroups.filter(g => g !== groupName);
-            if (currentChat === groupName) switchChat("ALL");
+            if (currentChat === groupName) switchChat("ALL"); // Auto-kick to public chat
             renderGroupsList();
         }
 
@@ -215,6 +259,7 @@
             closeGroupModal();
         }
 
+        // --- UI UPDATERS ---
         function renderGroupsList() {
             groupsList.innerHTML = "";
             myGroups.forEach(group => {
@@ -236,6 +281,7 @@
             chatTitle.innerText = target === "ALL" ? "Everyone (Public)" : target;
             if (!chatHistory[target]) chatHistory[target] = [];
             
+            // Toggle visibility of the "Delete Group" button
             if (myGroups.includes(target)) deleteGroupBtn.classList.remove('hidden');
             else deleteGroupBtn.classList.add('hidden');
 
@@ -252,7 +298,9 @@
             if (activeBtn) { activeBtn.classList.remove('bg-white'); activeBtn.classList.add('bg-[#efefef]'); }
         }
 
+        // --- MESSAGING LOGIC ---
         messageInput.addEventListener('input', () => {
+            // Typing detection (Triggers server every keystroke, rests after 1.5s)
             if (!ws || ws.readyState !== WebSocket.OPEN) return;
             ws.send(JSON.stringify({ type: "typing", receiver: currentChat, status: true }));
             clearTimeout(typingTimer);
@@ -271,7 +319,7 @@
         function sendMessage() {
             const text = messageInput.value.trim();
             if (!text) return;
-            ws.send(JSON.stringify({ type: "typing", receiver: currentChat, status: false }));
+            ws.send(JSON.stringify({ type: "typing", receiver: currentChat, status: false })); // Force stop typing UI
             clearTimeout(typingTimer);
             ws.send(JSON.stringify({ type: "message", receiver: currentChat, message: text }));
             messageInput.value = "";
@@ -281,18 +329,24 @@
             const file = input.files[0];
             if (!file) return;
             if (file.size > 2 * 1024 * 1024) { return alert("Image too large! Max 2MB."); }
-            const lockedIntendedChat = currentChat;
+            
+            const lockedIntendedChat = currentChat; // Lock scope to prevent race conditions
             const reader = new FileReader();
             reader.onload = function(e) { ws.send(JSON.stringify({ type: "message", receiver: lockedIntendedChat, message: "[IMAGE]" + e.target.result })); input.value = ""; };
             reader.readAsDataURL(file);
         }
 
         function handleDeleteEvent(data) {
+            // Figure out which history array to remove the message from
             let target;
             if (data.receiver === "ALL") target = "ALL";
             else if (myGroups.includes(data.receiver)) target = data.receiver;
             else target = data.sender === myName ? data.receiver : data.sender;
-            if (chatHistory[target]) { chatHistory[target] = chatHistory[target].filter(msg => msg.id !== data.msg_id); if (currentChat === target) renderChatBox(); }
+            
+            if (chatHistory[target]) { 
+                chatHistory[target] = chatHistory[target].filter(msg => msg.id !== data.msg_id); 
+                if (currentChat === target) renderChatBox(); // Live refresh
+            }
         }
 
         function deleteMessage(msgId) {
@@ -303,17 +357,20 @@
 
         function storeAndDisplayMessage(data) {
             let stamp = data.timestamp || new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-            if (stamp.length > 10) stamp = stamp.substring(11, 16); 
+            if (stamp.length > 10) stamp = stamp.substring(11, 16); // Format to HH:MM
+            
             const msgId = data.id, sender = data.sender, receiver = data.receiver;
             const isImage = data.message.startsWith("[IMAGE]");
-            const text = isImage ? data.message : data.message.replace(/\\n/g, '<br>');
+            const text = isImage ? data.message : data.message.replace(/\\n/g, '<br>'); // Preserve newlines
 
+            // Sort message into correct UI tab
             let target;
             if (receiver === "ALL") target = "ALL";
             else if (myGroups.includes(receiver)) target = receiver; 
             else target = sender === myName ? receiver : sender;     
             
             if (!chatHistory[target]) chatHistory[target] = [];
+            // Prevent duplicate message stacking
             if (!chatHistory[target].find(m => m.id === msgId)) { chatHistory[target].push({ id: msgId, sender: sender, text: text, stamp: stamp }); }
             if (target === currentChat) { renderChatBox(); if (sender !== myName) { activeTypers.delete(sender); if (activeTypers.size === 0) typingIndicator.classList.add('hidden'); } }
         }
@@ -325,20 +382,23 @@
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
+        // --- IMAGE MODAL HELPERS ---
         function openImageModal(src) { document.getElementById('modal-image').src = src; document.getElementById('image-modal').classList.remove('hidden'); }
         function closeImageModal() { document.getElementById('image-modal').classList.add('hidden'); document.getElementById('modal-image').src = ""; }
 
+        // --- DRAW BUBBLES ---
         function appendMessageToUI(msgId, sender, text, stamp, room) {
             const isMine = sender === myName;
             const div = document.createElement("div");
             div.className = `flex flex-col max-w-[70%] ${isMine ? 'self-end' : 'self-start'}`;
             
             let nameHTML = "";
+            // Show names above group/public messages, but not direct private messages
             if (!isMine && (room === "ALL" || myGroups.includes(room))) { nameHTML = `<span class="text-xs font-bold text-gray-500 ml-1 mb-1">${sender}</span>`; }
 
             const bubbleClass = isMine ? 'bg-[#d9fdd3] rounded-tl-lg rounded-tr-lg rounded-bl-lg' : 'bg-white rounded-tl-lg rounded-tr-lg rounded-br-lg shadow-sm border border-gray-100';
             
-            // UPDATED: The `msgId` check is now the only condition (removed `isMine`). Now EVERY message has a red X!
+            // Delete button: Attached to EVERY message. Visible on mobile by default, appears on hover for desktop.
             const deleteHTML = msgId ? `<div onclick="deleteMessage(${msgId})" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs cursor-pointer opacity-100 md:opacity-0 md:group-hover:opacity-100 transition shadow hover:bg-red-700 z-10" title="Delete Message/Photo">✕</div>` : "";
             
             const contentHTML = text.startsWith("[IMAGE]") ? `<img src="${text.substring(7)}" class="max-w-full rounded-md mb-1 cursor-zoom-in" style="max-height: 250px;" onclick="openImageModal(this.src)">` : `<span class="text-[15px] leading-relaxed break-words pr-12">${text}</span>`;
