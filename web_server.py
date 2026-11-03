@@ -23,7 +23,6 @@ def get_db():
     with conn:
         conn.execute("CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY, password TEXT NOT NULL)")
         conn.execute("CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, sender TEXT, receiver TEXT, message TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)")
-        # NEW: Tables for Group Chats
         conn.execute("CREATE TABLE IF NOT EXISTS groups (name TEXT PRIMARY KEY, created_by TEXT)")
         conn.execute("CREATE TABLE IF NOT EXISTS group_members (group_name TEXT, username TEXT)")
     return conn
@@ -63,14 +62,13 @@ async def websocket_endpoint(websocket: WebSocket):
     current_user = None
 
     def get_recipients(conn, target):
-        """Helper to figure out who should receive a message/event"""
         if target == "ALL":
             return list(manager.active_connections.keys())
         is_group = conn.execute("SELECT 1 FROM groups WHERE name=?", (target,)).fetchone()
         if is_group:
             mems = conn.execute("SELECT username FROM group_members WHERE group_name=?", (target,)).fetchall()
             return [m[0] for m in mems]
-        return [target, current_user] # Direct message (sender and receiver)
+        return [target, current_user]
 
     try:
         while True:
@@ -82,7 +80,6 @@ async def websocket_endpoint(websocket: WebSocket):
             
             msg_type = d.get("type")
 
-            # --- AUTHENTICATION ---
             if msg_type == "auth" and current_user is None:
                 u = str(d.get("username", "")).strip()
                 p = str(d.get("password", ""))
@@ -111,7 +108,6 @@ async def websocket_endpoint(websocket: WebSocket):
                                 with conn:
                                     conn.execute("INSERT INTO users VALUES(?, ?)", (u, hash_password(p)))
                                 ok, msg = True, "Account created."
-                    
                     elif action == "login":
                         if row and verify_password(row[0], p):
                             ok, msg = True, "Login successful."
@@ -129,12 +125,10 @@ async def websocket_endpoint(websocket: WebSocket):
                         await manager.send_to(websocket, {"type": "auth", "ok": True, "username": u, "message": msg})
                         
                         with closing(get_db()) as conn:
-                            # 1. Send the user their groups
                             my_groups_rows = conn.execute("SELECT group_name FROM group_members WHERE username=?", (u,)).fetchall()
                             my_groups = [r[0] for r in my_groups_rows]
                             await manager.send_to(websocket, {"type": "groups_list", "groups": my_groups})
 
-                            # 2. Load message history including group chats
                             placeholders = ','.join('?' * len(my_groups))
                             query = f"SELECT id, sender, receiver, message, timestamp FROM messages WHERE receiver = 'ALL' OR sender = ? OR receiver = ? {'OR receiver IN (' + placeholders + ')' if my_groups else ''} ORDER BY id DESC LIMIT 150"
                             params = [u, u] + my_groups
@@ -147,14 +141,11 @@ async def websocket_endpoint(websocket: WebSocket):
                 else:
                     await manager.send_to(websocket, {"type": "auth", "ok": False, "message": msg})
 
-            # --- CREATE GROUP ---
             elif msg_type == "create_group" and current_user:
                 g_name = str(d.get("group_name", "")).strip()
                 members = d.get("members", [])
                 if not g_name or not members: continue
-                
-                if current_user not in members:
-                    members.append(current_user) # Ensure creator is in the group!
+                if current_user not in members: members.append(current_user)
                 
                 with closing(get_db()) as conn:
                     try:
@@ -163,35 +154,45 @@ async def websocket_endpoint(websocket: WebSocket):
                             for m in members:
                                 conn.execute("INSERT INTO group_members (group_name, username) VALUES (?, ?)", (g_name, m))
                         
-                        # Tell all online members that they were added to a new group
                         for m in members:
                             if m in manager.active_connections:
                                 await manager.send_to(manager.active_connections[m], {"type": "new_group", "group_name": g_name})
                     except sqlite3.IntegrityError:
                         await manager.send_to(websocket, {"type": "error", "message": "A group with this name already exists."})
 
-            # --- TYPING INDICATORS ---
+            # --- NEW: DELETE OR LEAVE GROUP ---
+            elif msg_type == "delete_group" and current_user:
+                target_group = d.get("group_name")
+                with closing(get_db()) as conn:
+                    row = conn.execute("SELECT created_by FROM groups WHERE name=?", (target_group,)).fetchone()
+                    if row:
+                        if row[0] == current_user: # Creator deletes group entirely
+                            with conn:
+                                conn.execute("DELETE FROM groups WHERE name=?", (target_group,))
+                                conn.execute("DELETE FROM group_members WHERE group_name=?", (target_group,))
+                            for ws in manager.active_connections.values():
+                                await manager.send_to(ws, {"type": "group_deleted", "group_name": target_group})
+                        else: # Standard member just leaves
+                            with conn:
+                                conn.execute("DELETE FROM group_members WHERE group_name=? AND username=?", (target_group, current_user))
+                            await manager.send_to(websocket, {"type": "group_deleted", "group_name": target_group})
+
             elif msg_type == "typing" and current_user:
                 r = str(d.get("receiver", "ALL"))
                 status = bool(d.get("status", False))
                 payload = {"type": "typing", "sender": current_user, "receiver": r, "status": status}
-                
                 with closing(get_db()) as conn:
                     recipients = get_recipients(conn, r)
-                
                 for rec in set(recipients):
                     if rec != current_user and rec in manager.active_connections:
                         await manager.send_to(manager.active_connections[rec], payload)
 
-            # --- MESSAGING ---
             elif msg_type == "message" and current_user:
                 r = str(d.get("receiver", "ALL"))
                 m = str(d.get("message", "")).strip()[:5000000] 
                 if not m: continue
-                
                 with closing(get_db()) as conn:
                     recipients = get_recipients(conn, r)
-                    
                     if r != "ALL" and current_user not in recipients and len(recipients) <= 2 and r not in manager.active_connections:
                         await manager.send_to(websocket, {"type": "error", "message": "User is offline."})
                         continue
@@ -204,12 +205,10 @@ async def websocket_endpoint(websocket: WebSocket):
                     conn.commit()
                 
                 msg_payload = {"type": "message", "id": msg_id, "sender": current_user, "receiver": r, "message": m, "timestamp": db_stamp}
-                
                 for rec in set(recipients):
                     if rec in manager.active_connections:
                         await manager.send_to(manager.active_connections[rec], msg_payload)
 
-            # --- DELETE MESSAGE ---
             elif msg_type == "delete" and current_user:
                 msg_id = d.get("msg_id")
                 with closing(get_db()) as conn:
@@ -218,10 +217,8 @@ async def websocket_endpoint(websocket: WebSocket):
                     if row and row[0] == current_user:
                         cursor.execute("DELETE FROM messages WHERE id=?", (msg_id,))
                         conn.commit()
-                        
                         del_payload = {"type": "delete", "msg_id": msg_id, "sender": row[0], "receiver": row[1]}
                         recipients = get_recipients(conn, row[1])
-                        
                         for rec in set(recipients):
                             if rec in manager.active_connections:
                                 await manager.send_to(manager.active_connections[rec], del_payload)
