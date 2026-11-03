@@ -55,7 +55,6 @@
         <div class="flex-1 flex flex-col bg-[#efeae2] relative">
             <div class="bg-[#f0f2f5] h-16 flex items-center justify-between px-6 border-b border-gray-200 shrink-0">
                 <h2 id="chat-title" class="text-xl font-bold">Everyone (Public)</h2>
-                <!-- NEW: Delete Group Button -->
                 <button id="delete-group-btn" onclick="requestDeleteGroup()" class="hidden text-red-500 hover:bg-red-100 px-3 py-1 rounded font-bold text-sm transition">🗑️ Delete/Leave Group</button>
             </div>
 
@@ -65,13 +64,9 @@
                 Someone is typing...
             </div>
 
-            <!-- NEW: Emoji Picker Pop-up -->
-            <div id="emoji-picker" class="hidden absolute bottom-[80px] left-4 bg-white border border-gray-200 rounded-lg shadow-xl p-3 grid grid-cols-6 gap-3 text-2xl z-40">
-                <!-- Emojis injected by JS -->
-            </div>
+            <div id="emoji-picker" class="hidden absolute bottom-[80px] left-4 bg-white border border-gray-200 rounded-lg shadow-xl p-3 grid grid-cols-6 gap-3 text-2xl z-40"></div>
 
             <div class="bg-[#f0f2f5] p-4 flex items-center gap-2 shrink-0 relative">
-                <!-- NEW: Emoji Button -->
                 <button onclick="toggleEmojiPicker()" class="text-gray-500 hover:text-[#00a884] transition p-2 text-2xl" title="Add Emoji">🙂</button>
 
                 <input type="file" id="image-upload" accept="image/*" class="hidden" onchange="sendImage(this)">
@@ -131,22 +126,14 @@
         const typingIndicator = document.getElementById('typing-indicator');
         const deleteGroupBtn = document.getElementById('delete-group-btn');
 
-        // --- NEW: INITIALIZE EMOJI PICKER ---
         const emojiList = ['😀','😂','🤣','😍','🙏','👍','🔥','😊','🥰','😎','😢','😡','🎉','✨','💔','💯','🥳','👏'];
         const pickerDiv = document.getElementById('emoji-picker');
         emojiList.forEach(em => {
             pickerDiv.innerHTML += `<span class="cursor-pointer hover:scale-125 transition transform" onclick="addEmoji('${em}')">${em}</span>`;
         });
 
-        function toggleEmojiPicker() {
-            pickerDiv.classList.toggle('hidden');
-        }
-        function addEmoji(emoji) {
-            messageInput.value += emoji;
-            pickerDiv.classList.add('hidden');
-            messageInput.focus();
-        }
-        // Hide emoji picker if clicked outside
+        function toggleEmojiPicker() { pickerDiv.classList.toggle('hidden'); }
+        function addEmoji(emoji) { messageInput.value += emoji; pickerDiv.classList.add('hidden'); messageInput.focus(); }
         document.addEventListener('click', (e) => {
             if(!e.target.closest('#emoji-picker') && !e.target.closest('button[onclick="toggleEmojiPicker()"]')) {
                 pickerDiv.classList.add('hidden');
@@ -188,7 +175,7 @@
                 else if (data.type === "users") { onlineUsers = data.users.filter(u => u !== myName); updateUsersList(); }
                 else if (data.type === "groups_list") { myGroups = data.groups; renderGroupsList(); }
                 else if (data.type === "new_group") { if (!myGroups.includes(data.group_name)) { myGroups.push(data.group_name); renderGroupsList(); } }
-                else if (data.type === "group_deleted") { handleGroupDeleted(data.group_name); } // NEW
+                else if (data.type === "group_deleted") { handleGroupDeleted(data.group_name); }
                 else if (data.type === "message") storeAndDisplayMessage(data);
                 else if (data.type === "typing") handleTypingEvent(data);
                 else if (data.type === "delete") handleDeleteEvent(data);
@@ -198,7 +185,6 @@
             ws.onclose = () => { if (!intentionalDisconnect) { alert("Lost connection."); location.reload(); } };
         }
 
-        // --- NEW: LEAVE / DELETE GROUP LOGIC ---
         function requestDeleteGroup() {
             if (confirm(`Are you sure you want to Delete or Leave the group '${currentChat}'?`)) {
                 ws.send(JSON.stringify({ type: "delete_group", group_name: currentChat }));
@@ -250,7 +236,6 @@
             chatTitle.innerText = target === "ALL" ? "Everyone (Public)" : target;
             if (!chatHistory[target]) chatHistory[target] = [];
             
-            // Show Delete Group Button ONLY if looking at a group
             if (myGroups.includes(target)) deleteGroupBtn.classList.remove('hidden');
             else deleteGroupBtn.classList.add('hidden');
 
@@ -353,8 +338,8 @@
 
             const bubbleClass = isMine ? 'bg-[#d9fdd3] rounded-tl-lg rounded-tr-lg rounded-bl-lg' : 'bg-white rounded-tl-lg rounded-tr-lg rounded-br-lg shadow-sm border border-gray-100';
             
-            // UPDATED: The red 'X' to delete photos and messages is now visible by default on mobile phones (opacity-100) and appears on hover for desktop computers (md:opacity-0 md:group-hover:opacity-100).
-            const deleteHTML = (isMine && msgId) ? `<div onclick="deleteMessage(${msgId})" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs cursor-pointer opacity-100 md:opacity-0 md:group-hover:opacity-100 transition shadow hover:bg-red-700 z-10" title="Delete Message/Photo">✕</div>` : "";
+            // UPDATED: The `msgId` check is now the only condition (removed `isMine`). Now EVERY message has a red X!
+            const deleteHTML = msgId ? `<div onclick="deleteMessage(${msgId})" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs cursor-pointer opacity-100 md:opacity-0 md:group-hover:opacity-100 transition shadow hover:bg-red-700 z-10" title="Delete Message/Photo">✕</div>` : "";
             
             const contentHTML = text.startsWith("[IMAGE]") ? `<img src="${text.substring(7)}" class="max-w-full rounded-md mb-1 cursor-zoom-in" style="max-height: 250px;" onclick="openImageModal(this.src)">` : `<span class="text-[15px] leading-relaxed break-words pr-12">${text}</span>`;
 
