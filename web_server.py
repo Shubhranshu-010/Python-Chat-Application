@@ -160,19 +160,18 @@ async def websocket_endpoint(websocket: WebSocket):
                     except sqlite3.IntegrityError:
                         await manager.send_to(websocket, {"type": "error", "message": "A group with this name already exists."})
 
-            # --- NEW: DELETE OR LEAVE GROUP ---
             elif msg_type == "delete_group" and current_user:
                 target_group = d.get("group_name")
                 with closing(get_db()) as conn:
                     row = conn.execute("SELECT created_by FROM groups WHERE name=?", (target_group,)).fetchone()
                     if row:
-                        if row[0] == current_user: # Creator deletes group entirely
+                        if row[0] == current_user: 
                             with conn:
                                 conn.execute("DELETE FROM groups WHERE name=?", (target_group,))
                                 conn.execute("DELETE FROM group_members WHERE group_name=?", (target_group,))
                             for ws in manager.active_connections.values():
                                 await manager.send_to(ws, {"type": "group_deleted", "group_name": target_group})
-                        else: # Standard member just leaves
+                        else:
                             with conn:
                                 conn.execute("DELETE FROM group_members WHERE group_name=? AND username=?", (target_group, current_user))
                             await manager.send_to(websocket, {"type": "group_deleted", "group_name": target_group})
@@ -209,12 +208,14 @@ async def websocket_endpoint(websocket: WebSocket):
                     if rec in manager.active_connections:
                         await manager.send_to(manager.active_connections[rec], msg_payload)
 
+            # --- UPDATED: ANYONE CAN DELETE MESSAGES ---
             elif msg_type == "delete" and current_user:
                 msg_id = d.get("msg_id")
                 with closing(get_db()) as conn:
                     cursor = conn.cursor()
                     row = cursor.execute("SELECT sender, receiver FROM messages WHERE id=?", (msg_id,)).fetchone()
-                    if row and row[0] == current_user:
+                    
+                    if row: # Note: We removed the check restricting this to the sender!
                         cursor.execute("DELETE FROM messages WHERE id=?", (msg_id,))
                         conn.commit()
                         del_payload = {"type": "delete", "msg_id": msg_id, "sender": row[0], "receiver": row[1]}
