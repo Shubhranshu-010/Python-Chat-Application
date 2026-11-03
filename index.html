@@ -10,13 +10,12 @@
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        .fade-in { animation: fadeIn 0.2s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
 </head>
 <body class="bg-gray-100 h-screen w-screen overflow-hidden text-[#111b21] font-sans relative">
 
-    <!-- LOGIN SCREEN -->
     <div id="login-screen" class="flex h-full w-full items-center justify-center bg-[#efeae2]">
         <div class="bg-white p-10 rounded-lg shadow-lg w-96 border border-gray-200 fade-in">
             <h1 class="text-3xl font-bold text-center mb-8 text-[#000000]">Python Chat</h1>
@@ -27,12 +26,10 @@
         </div>
     </div>
 
-    <!-- MAIN CHAT INTERFACE -->
     <div id="chat-screen" class="hidden h-full w-full flex bg-[#ffffff] fade-in">
         
-        <!-- LEFT SIDEBAR -->
         <div class="w-1/3 max-w-sm flex flex-col border-r border-gray-200">
-            <div class="bg-[#f0f2f5] h-16 flex items-center px-4 border-b border-gray-200">
+            <div class="bg-[#f0f2f5] h-16 flex items-center px-4 border-b border-gray-200 shrink-0">
                 <div class="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center text-xl mr-3">👤</div>
                 <h2 id="my-username" class="text-lg font-bold">MyName</h2>
             </div>
@@ -43,37 +40,37 @@
                     <div class="w-10 h-10 bg-[#00a884] text-white rounded-full flex items-center justify-center mr-3">🌎</div>
                     <span class="text-lg">Everyone (Public)</span>
                 </div>
+                
+                <!-- NEW: Custom Groups Section -->
+                <div class="flex justify-between items-center px-4 pt-6 pb-2">
+                    <h3 class="text-sm font-bold text-gray-500">MY GROUPS</h3>
+                    <button onclick="openGroupModal()" class="text-[#00a884] font-bold text-2xl hover:bg-gray-100 px-2 rounded-lg transition" title="Create Group">+</button>
+                </div>
+                <div id="groups-list"></div>
+
                 <h3 class="text-sm font-bold text-gray-500 px-4 pt-6 pb-2">DIRECT MESSAGES</h3>
                 <div id="users-list"></div>
             </div>
         </div>
 
-        <!-- RIGHT MAIN CHAT AREA -->
         <div class="flex-1 flex flex-col bg-[#efeae2]">
-            <div class="bg-[#f0f2f5] h-16 flex items-center px-6 border-b border-gray-200">
+            <div class="bg-[#f0f2f5] h-16 flex items-center px-6 border-b border-gray-200 shrink-0">
                 <h2 id="chat-title" class="text-xl font-bold">Everyone (Public)</h2>
             </div>
 
-            <!-- Messages Box -->
             <div id="chat-box" class="flex-1 overflow-y-auto p-6 flex flex-col gap-2 relative"></div>
 
-            <!-- Typing Indicator Area -->
-            <div id="typing-indicator" class="h-6 px-6 text-xs text-[#00a884] font-semibold italic bg-[#efeae2] hidden">
+            <div id="typing-indicator" class="h-6 px-6 text-xs text-[#00a884] font-semibold italic bg-[#efeae2] hidden shrink-0">
                 Someone is typing...
             </div>
 
-            <!-- Input Area -->
-            <div class="bg-[#f0f2f5] p-4 flex items-center gap-2">
+            <div class="bg-[#f0f2f5] p-4 flex items-center gap-2 shrink-0">
                 <input type="file" id="image-upload" accept="image/*" class="hidden" onchange="sendImage(this)">
-                <button id="attach-btn" onclick="document.getElementById('image-upload').click()" class="text-gray-500 hover:text-[#00a884] transition p-2 cursor-pointer" title="Attach Image">
-                    <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor">
-                        <path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5a2.5 2.5 0 0 1 5 0v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5a2.5 2.5 0 0 0 5 0V5c0-3.04-2.46-5.5-5.5-5.5S4 1.96 4 5v11.5c0 3.87 3.13 7 7 7s7-3.13 7-7V6h-1.5z"></path>
-                    </svg>
+                <button id="attach-btn" onclick="document.getElementById('image-upload').click()" class="text-gray-500 hover:text-[#00a884] transition p-2 cursor-pointer">
+                    <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5a2.5 2.5 0 0 1 5 0v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5a2.5 2.5 0 0 0 5 0V5c0-3.04-2.46-5.5-5.5-5.5S4 1.96 4 5v11.5c0 3.87 3.13 7 7 7s7-3.13 7-7V6h-1.5z"></path></svg>
                 </button>
 
-                <input type="text" id="message-input" placeholder="Type a message" 
-                    class="flex-1 bg-white px-5 py-3 rounded-full outline-none border border-gray-300 focus:border-[#00a884]"
-                    onkeypress="if(event.key === 'Enter') sendMessage()">
+                <input type="text" id="message-input" placeholder="Type a message" class="flex-1 bg-white px-5 py-3 rounded-full outline-none border border-gray-300 focus:border-[#00a884]" onkeypress="if(event.key === 'Enter') sendMessage()">
                 <button onclick="sendMessage()" class="bg-[#00a884] text-white w-12 h-12 rounded-full flex items-center justify-center hover:bg-[#008f6f] transition shadow-sm shrink-0">
                     <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path></svg>
                 </button>
@@ -81,20 +78,41 @@
         </div>
     </div>
 
-    <!-- IMAGE VIEWER MODAL OVERLAY -->
-    <div id="image-modal" class="hidden fixed inset-0 z-50 bg-black/90 flex items-center justify-center fade-in cursor-zoom-out" onclick="closeModal()">
+    <!-- MODALS -->
+    <div id="image-modal" class="hidden fixed inset-0 z-50 bg-black/90 flex items-center justify-center fade-in cursor-zoom-out" onclick="closeImageModal()">
         <span class="absolute top-5 right-8 text-white text-4xl cursor-pointer hover:text-gray-300">&times;</span>
         <img id="modal-image" class="max-w-[90%] max-h-[90vh] object-contain rounded shadow-2xl">
     </div>
 
-    <!-- JAVASCRIPT LOGIC -->
+    <!-- NEW: CREATE GROUP MODAL -->
+    <div id="group-modal" class="hidden fixed inset-0 z-50 bg-black/60 flex items-center justify-center fade-in">
+        <div class="bg-white p-6 rounded-lg w-96 shadow-xl">
+            <h3 class="text-xl font-bold mb-4 text-gray-800">Create New Group</h3>
+            <input type="text" id="new-group-name" placeholder="Group Name (e.g. Work Team)" class="w-full bg-gray-100 p-3 rounded mb-4 outline-none focus:ring-2 focus:ring-[#00a884]">
+            
+            <p class="text-sm font-bold text-gray-500 mb-2">Select Online Members:</p>
+            <div id="group-member-list" class="max-h-40 overflow-y-auto mb-6 border border-gray-200 p-2 rounded flex flex-col gap-2">
+                <!-- Checkboxes inject here -->
+            </div>
+            
+            <div class="flex justify-end gap-3">
+                <button onclick="closeGroupModal()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition font-bold">Cancel</button>
+                <button onclick="createGroup()" class="px-4 py-2 bg-[#00a884] text-white rounded hover:bg-[#008f6f] transition font-bold">Create Group</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let ws = null;
         let myName = "";
         let currentChat = "ALL";
         const chatHistory = { "ALL": [] }; 
+        
+        // Data states
+        let onlineUsers = [];
+        let myGroups = [];
+        
         let intentionalDisconnect = false; 
-
         let typingTimer = null;
         const activeTypers = new Set(); 
 
@@ -102,13 +120,10 @@
         const chatScreen = document.getElementById('chat-screen');
         const chatBox = document.getElementById('chat-box');
         const usersList = document.getElementById('users-list');
+        const groupsList = document.getElementById('groups-list');
         const chatTitle = document.getElementById('chat-title');
         const messageInput = document.getElementById('message-input');
         const typingIndicator = document.getElementById('typing-indicator');
-
-        const imageModal = document.getElementById('image-modal');
-        const modalImage = document.getElementById('modal-image');
-        const attachBtn = document.getElementById('attach-btn');
 
         function authenticate(action) {
             const user = document.getElementById('username').value.trim();
@@ -119,15 +134,11 @@
             intentionalDisconnect = false;
 
             try { 
-    // Automatically use the correct cloud URL and secure WebSockets (wss://)
-    const wsProtocol = window.location.protocol === "https:" ? "wss://" : "ws://";
-    ws = new WebSocket(wsProtocol + window.location.host + "/ws"); 
-} 
-            catch(e) { return alert("Browser blocked the connection."); }
+                const wsProtocol = window.location.protocol === "https:" ? "wss://" : "ws://";
+                ws = new WebSocket(wsProtocol + window.location.host + "/ws"); 
+            } catch(e) { return alert("Browser blocked the connection."); }
 
-            ws.onopen = () => {
-                ws.send(JSON.stringify({ type: "auth", action: action, username: user, password: pass }));
-            };
+            ws.onopen = () => { ws.send(JSON.stringify({ type: "auth", action: action, username: user, password: pass })); };
 
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
@@ -146,7 +157,20 @@
                         ws.close();
                     }
                 } 
-                else if (data.type === "users") updateUsersList(data.users);
+                else if (data.type === "users") {
+                    onlineUsers = data.users.filter(u => u !== myName);
+                    updateUsersList();
+                }
+                else if (data.type === "groups_list") {
+                    myGroups = data.groups;
+                    renderGroupsList();
+                }
+                else if (data.type === "new_group") {
+                    if (!myGroups.includes(data.group_name)) {
+                        myGroups.push(data.group_name);
+                        renderGroupsList();
+                    }
+                }
                 else if (data.type === "message") storeAndDisplayMessage(data);
                 else if (data.type === "typing") handleTypingEvent(data);
                 else if (data.type === "delete") handleDeleteEvent(data);
@@ -154,81 +178,78 @@
             };
 
             ws.onclose = () => {
-                if (!intentionalDisconnect) {
-                    alert("Lost connection to server. Refreshing.");
-                    location.reload();
-                }
+                if (!intentionalDisconnect) { alert("Lost connection."); location.reload(); }
             };
         }
 
-        messageInput.addEventListener('input', () => {
-            if (!ws || ws.readyState !== WebSocket.OPEN) return;
-            ws.send(JSON.stringify({ type: "typing", receiver: currentChat, status: true }));
-            clearTimeout(typingTimer);
-            typingTimer = setTimeout(() => {
-                ws.send(JSON.stringify({ type: "typing", receiver: currentChat, status: false }));
-            }, 1500);
-        });
+        // --- GROUP CREATION LOGIC ---
+        function openGroupModal() {
+            document.getElementById('new-group-name').value = "";
+            const listDiv = document.getElementById('group-member-list');
+            listDiv.innerHTML = "";
 
-        function handleTypingEvent(data) {
-            const isRelevant = (currentChat === "ALL" && data.receiver === "ALL") || 
-                               (currentChat !== "ALL" && data.sender === currentChat);
-            
-            if (isRelevant) {
-                if (data.status) activeTypers.add(data.sender);
-                else activeTypers.delete(data.sender);
-
-                if (activeTypers.size > 0) {
-                    const names = Array.from(activeTypers).join(", ");
-                    const verb = activeTypers.size > 1 ? "are" : "is";
-                    typingIndicator.innerText = `${names} ${verb} typing...`;
-                    typingIndicator.classList.remove('hidden');
-                } else {
-                    typingIndicator.classList.add('hidden');
-                }
-            }
-        }
-
-        // --- NEW: Handle incoming deletions ---
-        function handleDeleteEvent(data) {
-            // Find which chat screen this belonged to
-            const target = data.receiver === "ALL" ? "ALL" : (data.sender === myName ? data.receiver : data.sender);
-            
-            if (chatHistory[target]) {
-                // Remove it from history array
-                chatHistory[target] = chatHistory[target].filter(msg => msg.id !== data.msg_id);
-                // If we are looking at that screen, re-render it instantly!
-                if (currentChat === target) {
-                    renderChatBox();
-                }
-            }
-        }
-
-        // --- NEW: Tell server to delete ---
-        function deleteMessage(msgId) {
-            if(confirm("Delete this message for everyone?")) {
-                ws.send(JSON.stringify({ type: "delete", msg_id: msgId }));
-            }
-        }
-
-        function updateUsersList(users) {
-            usersList.innerHTML = "";
-            users.forEach(user => {
-                if (user !== myName) {
-                    const div = document.createElement("div");
-                    div.className = "chat-btn px-4 py-3 cursor-pointer flex items-center hover:bg-gray-50 transition border-b border-gray-100";
-                    div.id = `btn-${user}`;
-                    div.onclick = () => switchChat(user);
-                    div.innerHTML = `
-                        <div class="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center mr-3 text-lg">👤</div>
-                        <span class="text-lg text-gray-800">${user}</span>
+            if (onlineUsers.length === 0) {
+                listDiv.innerHTML = `<p class="text-gray-400 text-sm p-2">No other users are currently online.</p>`;
+            } else {
+                onlineUsers.forEach(user => {
+                    listDiv.innerHTML += `
+                        <label class="flex items-center gap-2 cursor-pointer p-1 hover:bg-gray-50">
+                            <input type="checkbox" value="${user}" class="group-checkbox w-4 h-4 text-[#00a884]">
+                            <span>${user}</span>
+                        </label>
                     `;
-                    usersList.appendChild(div);
-                }
+                });
+            }
+            document.getElementById('group-modal').classList.remove('hidden');
+        }
+
+        function closeGroupModal() {
+            document.getElementById('group-modal').classList.add('hidden');
+        }
+
+        function createGroup() {
+            const groupName = document.getElementById('new-group-name').value.trim();
+            if (!groupName) return alert("Group needs a name!");
+            if (groupName === "ALL") return alert("Reserved name.");
+
+            const selectedBoxes = document.querySelectorAll('.group-checkbox:checked');
+            const members = Array.from(selectedBoxes).map(box => box.value);
+
+            ws.send(JSON.stringify({
+                type: "create_group",
+                group_name: groupName,
+                members: members
+            }));
+            closeGroupModal();
+        }
+
+        function renderGroupsList() {
+            groupsList.innerHTML = "";
+            myGroups.forEach(group => {
+                groupsList.innerHTML += `
+                    <div id="btn-${group}" onclick="switchChat('${group}')" class="chat-btn px-4 py-3 cursor-pointer flex items-center hover:bg-gray-50 transition border-b border-gray-100 bg-white">
+                        <div class="w-10 h-10 bg-[#4b5563] text-white rounded-full flex items-center justify-center mr-3 text-lg">👥</div>
+                        <span class="text-lg text-gray-800 font-semibold">${group}</span>
+                    </div>
+                `;
             });
             highlightActiveChatBtn();
         }
 
+        function updateUsersList() {
+            usersList.innerHTML = "";
+            onlineUsers.forEach(user => {
+                usersList.innerHTML += `
+                    <div id="btn-${user}" onclick="switchChat('${user}')" class="chat-btn px-4 py-3 cursor-pointer flex items-center hover:bg-gray-50 transition border-b border-gray-100 bg-white">
+                        <div class="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center mr-3 text-lg">👤</div>
+                        <span class="text-lg text-gray-800">${user}</span>
+                    </div>
+                `;
+            });
+            highlightActiveChatBtn();
+        }
+
+        // --- CHAT LOGIC ---
         function switchChat(target) {
             currentChat = target;
             chatTitle.innerText = target === "ALL" ? "Everyone (Public)" : target;
@@ -247,6 +268,7 @@
                 btn.classList.remove('bg-[#efefef]');
                 btn.classList.add('bg-white');
             });
+            // Try to find the button (could be in ALL, Groups, or Users)
             const activeBtn = document.getElementById(`btn-${currentChat}`);
             if (activeBtn) {
                 activeBtn.classList.remove('bg-white');
@@ -254,13 +276,31 @@
             }
         }
 
+        messageInput.addEventListener('input', () => {
+            if (!ws || ws.readyState !== WebSocket.OPEN) return;
+            ws.send(JSON.stringify({ type: "typing", receiver: currentChat, status: true }));
+            clearTimeout(typingTimer);
+            typingTimer = setTimeout(() => { ws.send(JSON.stringify({ type: "typing", receiver: currentChat, status: false })); }, 1500);
+        });
+
+        function handleTypingEvent(data) {
+            const isRelevant = (currentChat === data.receiver) || (data.receiver !== "ALL" && currentChat === data.sender && !myGroups.includes(data.receiver));
+            if (isRelevant) {
+                if (data.status) activeTypers.add(data.sender);
+                else activeTypers.delete(data.sender);
+
+                if (activeTypers.size > 0) {
+                    typingIndicator.innerText = `${Array.from(activeTypers).join(", ")} ${activeTypers.size > 1 ? "are" : "is"} typing...`;
+                    typingIndicator.classList.remove('hidden');
+                } else { typingIndicator.classList.add('hidden'); }
+            }
+        }
+
         function sendMessage() {
             const text = messageInput.value.trim();
             if (!text) return;
-
             ws.send(JSON.stringify({ type: "typing", receiver: currentChat, status: false }));
             clearTimeout(typingTimer);
-
             ws.send(JSON.stringify({ type: "message", receiver: currentChat, message: text }));
             messageInput.value = "";
         }
@@ -268,53 +308,59 @@
         function sendImage(input) {
             const file = input.files[0];
             if (!file) return;
-
-            if (file.size > 2 * 1024 * 1024) { 
-                alert("Image is too large! Please select an image under 2MB.");
-                input.value = ""; 
-                return;
-            }
-
+            if (file.size > 2 * 1024 * 1024) { return alert("Image too large! Max 2MB."); }
+            
             const lockedIntendedChat = currentChat;
-            attachBtn.classList.add('animate-pulse', 'text-[#00a884]');
-
             const reader = new FileReader();
             reader.onload = function(e) {
-                const base64String = e.target.result;
-                ws.send(JSON.stringify({ 
-                    type: "message", 
-                    receiver: lockedIntendedChat, 
-                    message: "[IMAGE]" + base64String 
-                }));
+                ws.send(JSON.stringify({ type: "message", receiver: lockedIntendedChat, message: "[IMAGE]" + e.target.result }));
                 input.value = ""; 
-                attachBtn.classList.remove('animate-pulse', 'text-[#00a884]');
             };
             reader.readAsDataURL(file);
+        }
+
+        function handleDeleteEvent(data) {
+            // Determine which array the message belongs to
+            let target;
+            if (data.receiver === "ALL") target = "ALL";
+            else if (myGroups.includes(data.receiver)) target = data.receiver;
+            else target = data.sender === myName ? data.receiver : data.sender;
+
+            if (chatHistory[target]) {
+                chatHistory[target] = chatHistory[target].filter(msg => msg.id !== data.msg_id);
+                if (currentChat === target) renderChatBox();
+            }
+        }
+
+        function deleteMessage(msgId) {
+            if(confirm("Delete this message for everyone?")) {
+                ws.send(JSON.stringify({ type: "delete", msg_id: msgId }));
+            }
         }
 
         function storeAndDisplayMessage(data) {
             let stamp = data.timestamp || new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
             if (stamp.length > 10) stamp = stamp.substring(11, 16); 
 
-            const msgId = data.id; // Extract Unique ID assigned by database
+            const msgId = data.id; 
             const sender = data.sender;
             const receiver = data.receiver;
             const isImage = data.message.startsWith("[IMAGE]");
             const text = isImage ? data.message : data.message.replace(/\\n/g, '<br>');
 
-            // Secure routing target
-            const target = receiver === "ALL" ? "ALL" : (sender === myName ? receiver : sender);
+            // Determine correct screen target
+            let target;
+            if (receiver === "ALL") target = "ALL";
+            else if (myGroups.includes(receiver)) target = receiver; // Group message
+            else target = sender === myName ? receiver : sender;     // Direct Message
             
             if (!chatHistory[target]) chatHistory[target] = [];
-            
-            // Avoid duplicate pushes (e.g. if switching screens quickly)
             if (!chatHistory[target].find(m => m.id === msgId)) {
                 chatHistory[target].push({ id: msgId, sender: sender, text: text, stamp: stamp });
             }
 
             if (target === currentChat) {
-                renderChatBox(); // Re-render the whole box securely to prevent overlaps
-                
+                renderChatBox();
                 if (sender !== myName) {
                     activeTypers.delete(sender);
                     if (activeTypers.size === 0) typingIndicator.classList.add('hidden');
@@ -329,55 +375,32 @@
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
-        function openModal(src) {
-            modalImage.src = src;
-            imageModal.classList.remove('hidden');
-        }
+        function openImageModal(src) { document.getElementById('modal-image').src = src; document.getElementById('image-modal').classList.remove('hidden'); }
+        function closeImageModal() { document.getElementById('image-modal').classList.add('hidden'); document.getElementById('modal-image').src = ""; }
 
-        function closeModal() {
-            imageModal.classList.add('hidden');
-            modalImage.src = "";
-        }
-
-        // --- UPDATED: Render bubbles with a hidden Delete 'X' ---
         function appendMessageToUI(msgId, sender, text, stamp, room) {
             const isMine = sender === myName;
             const div = document.createElement("div");
-            
             div.className = `flex flex-col max-w-[70%] ${isMine ? 'self-end' : 'self-start'}`;
             
             let nameHTML = "";
-            if (!isMine && room === "ALL") {
+            // If it's not our message, AND we are in a group chat (or ALL), show who sent it!
+            if (!isMine && (room === "ALL" || myGroups.includes(room))) {
                 nameHTML = `<span class="text-xs font-bold text-gray-500 ml-1 mb-1">${sender}</span>`;
             }
 
-            const bubbleClass = isMine ? 'bg-[#d9fdd3] rounded-tl-lg rounded-tr-lg rounded-bl-lg' 
-                                       : 'bg-white rounded-tl-lg rounded-tr-lg rounded-br-lg shadow-sm border border-gray-100';
+            const bubbleClass = isMine ? 'bg-[#d9fdd3] rounded-tl-lg rounded-tr-lg rounded-bl-lg' : 'bg-white rounded-tl-lg rounded-tr-lg rounded-br-lg shadow-sm border border-gray-100';
+            const deleteHTML = (isMine && msgId) ? `<div onclick="deleteMessage(${msgId})" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs cursor-pointer opacity-0 group-hover:opacity-100 transition shadow hover:bg-red-700 z-10" title="Delete Message">✕</div>` : "";
+            const contentHTML = text.startsWith("[IMAGE]") ? `<img src="${text.substring(7)}" class="max-w-full rounded-md mb-1 cursor-zoom-in" style="max-height: 250px;" onclick="openImageModal(this.src)">` : `<span class="text-[15px] leading-relaxed break-words pr-12">${text}</span>`;
 
-            // Delete button logic (only renders for your own messages)
-            let deleteHTML = "";
-            if (isMine && msgId) {
-                deleteHTML = `<div onclick="deleteMessage(${msgId})" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs cursor-pointer opacity-0 group-hover:opacity-100 transition shadow hover:bg-red-700 z-10" title="Delete Message for Everyone">✕</div>`;
-            }
-
-            let contentHTML = "";
-            if (text.startsWith("[IMAGE]")) {
-                const base64Str = text.substring(7); 
-                contentHTML = `<img src="${base64Str}" class="max-w-full rounded-md mb-1 cursor-zoom-in" style="max-height: 250px;" onclick="openModal(this.src)">`;
-            } else {
-                contentHTML = `<span class="text-[15px] leading-relaxed break-words pr-12">${text}</span>`;
-            }
-
-            // Note the "group" class added to trigger the hover effect on the delete button!
             div.innerHTML = `
                 ${nameHTML}
                 <div class="${bubbleClass} p-2 flex flex-col relative min-w-[100px] group">
                     ${deleteHTML}
                     ${contentHTML}
-                    <span class="text-[10px] text-gray-400 self-end mt-1 ${text.startsWith('[IMAGE]') ? '' : 'absolute bottom-1 right-2'}">${stamp}${isMine ? ' ✓✓' : ''}</span>
+                    <span class="text-[10px] text-gray-400 self-end mt-1 flex items-center ${text.startsWith('[IMAGE]') ? '' : 'absolute bottom-1 right-2'}">${stamp} ${isMine ? '<span class="text-gray-400 font-bold ml-1">✓✓</span>' : ''}</span>
                 </div>
             `;
-            
             chatBox.appendChild(div);
         }
     </script>
