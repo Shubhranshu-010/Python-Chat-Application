@@ -256,6 +256,10 @@
             if (pass.length < 6) {
                 return alert("Password must be at least 6 characters long.");
             }
+            const alphanumericRegex = /^[a-zA-Z0-9]+$/;
+            if (!alphanumericRegex.test(user)) {
+                return alert("Username can only contain letters and numbers (no spaces or symbols).");
+            }
 
             document.getElementById('login-btn').innerText = "Connecting...";
             intentionalDisconnect = false;
@@ -434,35 +438,64 @@
                     typingIndicator.classList.add('hidden'); 
                 }
             }
+        
+        }
+        // 2. SECURITY: XSS Sanitizer to prevent malicious script injection
+        function escapeHTML(str) {
+            return str.replace(/[&<>'"]/g, function(tag) {
+                const chars = { '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' };
+                return chars[tag] || tag;
+            });
         }
 
         function sendMessage() {
-            const text = messageInput.value.trim();
+            let text = messageInput.value.trim();
             if (!text) return;
-            
-            // Force disable typing indicator immediately upon sending
+
+            // 3. DATABASE OPTIMIZATION: Max 500 characters
+            if (text.length > 500) {
+                return alert("Message is too long! Please keep it under 500 characters.");
+            }
+
+            // Clean the text before sending it to the database
+            text = escapeHTML(text);
+
             ws.send(JSON.stringify({ type: "typing", receiver: currentChat, status: false }));
             clearTimeout(typingTimer);
             
             ws.send(JSON.stringify({ type: "message", receiver: currentChat, message: text }));
             messageInput.value = "";
         }
-
+        
         function sendImage(input) {
             const file = input.files[0];
             if (!file) return;
-            if (file.size > 2 * 1024 * 1024) return alert("Image too large! Max 2MB."); // Client-side size limit validation
+
+            // 4. FILE SECURITY: Strict MIME type validation
+            const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+            if (!validTypes.includes(file.type)) {
+                input.value = ""; // Clear the bad file
+                return alert("Invalid file type! Please upload only JPG, PNG, GIF, or WEBP images.");
+            }
+
+            if (file.size > 2 * 1024 * 1024) { 
+                input.value = ""; 
+                return alert("Image too large! Max 2MB."); 
+            }
             
-            const lockedIntendedChat = currentChat; // Lock scope to prevent race condition if user switches chats while loading
+            const lockedIntendedChat = currentChat; 
             const reader = new FileReader();
             
             reader.onload = function(e) { 
-                // Prepend "[IMAGE]" flag for the server/receiver to parse the Base64 data correctly
                 ws.send(JSON.stringify({ type: "message", receiver: lockedIntendedChat, message: "[IMAGE]" + e.target.result })); 
                 input.value = ""; 
             };
-            reader.readAsDataURL(file); // Convert binary image to Base64 string
+            reader.readAsDataURL(file); 
         }
+        
+
+        
+        
 
         // ==============================================
         // MESSAGE HISTORY & RENDERING
