@@ -160,7 +160,26 @@
         // Typing indicator timers
         let intentionalDisconnect = false; 
         let typingTimer = null;
-        const activeTypers = new Set(); 
+        const activeTypers = new Set();
+
+        // PASTE YOUR NEW CODE HERE:
+        let passwordTimer = null;
+
+        function togglePasswordVisibility() {
+            const passInput = document.getElementById('password');
+            
+            if (passInput.type === 'text') {
+                passInput.type = 'password';
+                clearTimeout(passwordTimer);
+            } else {
+                passInput.type = 'text';
+                if (passwordTimer) clearTimeout(passwordTimer);
+                passwordTimer = setTimeout(() => {
+                    passInput.type = 'password';
+                }, 7000);
+            }
+        }
+        // END OF NEW CODE
 
         // HTML Element lookups
         const loginScreen = document.getElementById('login-screen');
