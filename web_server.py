@@ -148,28 +148,41 @@ async def websocket_endpoint(websocket: WebSocket):
 
                 # If login/registration succeeds, set up their session
                 if ok:
+                    # =========================================================
+                    # GHOST CONNECTION FIX (Step 1)
+                    # =========================================================
+                    # If the user is already logged in (e.g., in a dead tab), kick out the old connection
+                    # and allow this fresh tab/connection to take over instantly.
                     if u in manager.active_connections:
-                        await manager.send_to(websocket, {"type": "auth", "ok": False, "message": "User already online."})
-                    else:
-                        current_user = u
-                        manager.active_connections[u] = websocket
-                        await manager.send_to(websocket, {"type": "auth", "ok": True, "username": u, "message": msg})
+                        old_ws = manager.active_connections[u]
+                        try:
+                            await old_ws.close() # Force close the old/dead tab
+                        except Exception:
+                            pass
+                            
+                    # Register the fresh connection
+                    current_user = u
+                    manager.active_connections[u] = websocket
+                    
+                    # Send success message to the frontend
+                    await manager.send_to(websocket, {"type": "auth", "ok": True, "username": u, "message": msg})
+                    # =========================================================
                         
-                        # Load their historical groups and messages
-                        with closing(get_db()) as conn:
-                            my_groups_rows = conn.execute("SELECT group_name FROM group_members WHERE username=?", (u,)).fetchall()
-                            my_groups = [r[0] for r in my_groups_rows]
-                            await manager.send_to(websocket, {"type": "groups_list", "groups": my_groups})
+                    # Load their historical groups and messages
+                    with closing(get_db()) as conn:
+                        my_groups_rows = conn.execute("SELECT group_name FROM group_members WHERE username=?", (u,)).fetchall()
+                        my_groups = [r[0] for r in my_groups_rows]
+                        await manager.send_to(websocket, {"type": "groups_list", "groups": my_groups})
 
-                            placeholders = ','.join('?' * len(my_groups))
-                            query = f"SELECT id, sender, receiver, message, timestamp FROM messages WHERE receiver = 'ALL' OR sender = ? OR receiver = ? {'OR receiver IN (' + placeholders + ')' if my_groups else ''} ORDER BY id DESC LIMIT 150"
-                            params = [u, u] + my_groups
-                            rows = conn.execute(query, params).fetchall()
-                        
-                        for msg_id, sender, receiver, message, timestamp in reversed(rows):
-                            await manager.send_to(websocket, {"type": "message", "id": msg_id, "sender": sender, "receiver": receiver, "message": message, "timestamp": timestamp})
-                        
-                        await manager.broadcast_users()
+                        placeholders = ','.join('?' * len(my_groups))
+                        query = f"SELECT id, sender, receiver, message, timestamp FROM messages WHERE receiver = 'ALL' OR sender = ? OR receiver = ? {'OR receiver IN (' + placeholders + ')' if my_groups else ''} ORDER BY id DESC LIMIT 150"
+                        params = [u, u] + my_groups
+                        rows = conn.execute(query, params).fetchall()
+                    
+                    for msg_id, sender, receiver, message, timestamp in reversed(rows):
+                        await manager.send_to(websocket, {"type": "message", "id": msg_id, "sender": sender, "receiver": receiver, "message": message, "timestamp": timestamp})
+                    
+                    await manager.broadcast_users()
                 else:
                     await manager.send_to(websocket, {"type": "auth", "ok": False, "message": msg})
 
@@ -207,8 +220,8 @@ async def websocket_endpoint(websocket: WebSocket):
                             with conn:
                                 conn.execute("DELETE FROM groups WHERE name=?", (target_group,))
                                 conn.execute("DELETE FROM group_members WHERE group_name=?", (target_group,))
-                            for ws in manager.active_connections.values():
-                                await manager.send_to(ws, {"type": "group_deleted", "group_name": target_group})
+                            for ws_conn in manager.active_connections.values():
+                                await manager.send_to(ws_conn, {"type": "group_deleted", "group_name": target_group})
                         else:
                             # Standard user clicked: Just leave the group
                             with conn:
@@ -252,7 +265,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     if rec in manager.active_connections:
                         await manager.send_to(manager.active_connections[rec], msg_payload)
 
-            # --- DELETE MESSAGE (FIXED: ANYONE CAN DELETE) ---
+            # --- DELETE MESSAGE ---
             elif msg_type == "delete" and current_user:
                 msg_id = d.get("msg_id")
                 
@@ -287,18 +300,20 @@ async def websocket_endpoint(websocket: WebSocket):
 
             elif current_user is None:
                 await manager.send_to(websocket, {"type": "error", "message": "Please log in first."})
+                
     except WebSocketDisconnect:
         # 1. Check if the user successfully logged in before disconnecting
-        if username in active_connections:
-            # 2. Remove them from the active connections dictionary
-            del active_connections[username]
-            
-            # 3. Broadcast the updated online users list to everyone else
-            await broadcast_online_users()
+        if current_user and current_user in manager.active_connections:
+            # 2. CRITICAL CHECK: Make sure the connection we are deleting is THIS specific tab's connection.
+            # This prevents an old ghost tab closing from accidentally deleting a brand new tab's active connection.
+            if manager.active_connections[current_user] == websocket:
+                del manager.active_connections[current_user]
+                # 3. Broadcast the updated online users list to everyone else
+                await manager.broadcast_users()
             
     except Exception as e:
         # Catch any other unexpected network crashes and clean up the user
-        if username in active_connections:
-            del active_connections[username]
-            await broadcast_online_users()
-   
+        if current_user and current_user in manager.active_connections:
+            if manager.active_connections[current_user] == websocket:
+                del manager.active_connections[current_user]
+                await manager.broadcast_users()
