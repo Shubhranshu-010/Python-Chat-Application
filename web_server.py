@@ -287,9 +287,18 @@ async def websocket_endpoint(websocket: WebSocket):
 
             elif current_user is None:
                 await manager.send_to(websocket, {"type": "error", "message": "Please log in first."})
-
     except WebSocketDisconnect:
-        # Handle cleanup when a user closes their browser
-        if current_user and current_user in manager.active_connections:
-            del manager.active_connections[current_user]
-            await manager.broadcast_users()
+        # 1. Check if the user successfully logged in before disconnecting
+        if username in active_connections:
+            # 2. Remove them from the active connections dictionary
+            del active_connections[username]
+            
+            # 3. Broadcast the updated online users list to everyone else
+            await broadcast_online_users()
+            
+    except Exception as e:
+        # Catch any other unexpected network crashes and clean up the user
+        if username in active_connections:
+            del active_connections[username]
+            await broadcast_online_users()
+   
