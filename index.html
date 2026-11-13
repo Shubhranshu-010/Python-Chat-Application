@@ -65,10 +65,14 @@
         
         <!-- LEFT SIDEBAR: Navigation, Groups, and Direct Messages -->
         <div class="w-1/3 max-w-sm flex flex-col border-r border-gray-200">
-            <!-- Current User Profile Header -->
-            <div class="bg-[#f0f2f5] h-16 flex items-center px-4 border-b border-gray-200 shrink-0">
-                <div class="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center text-xl mr-3">👤</div>
-                <h2 id="my-username" class="text-lg font-bold">MyName</h2>
+            <!-- Current User Profile Header (UPDATED WITH LOG OUT BUTTON) -->
+            <div class="bg-[#f0f2f5] h-16 flex items-center justify-between px-4 border-b border-gray-200 shrink-0">
+                <div class="flex items-center">
+                    <div class="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center text-xl mr-3">👤</div>
+                    <h2 id="my-username" class="text-lg font-bold">MyName</h2>
+                </div>
+                <!-- NEW LOG OUT BUTTON -->
+                <button onclick="logout()" class="text-red-500 hover:bg-red-100 px-3 py-1 rounded text-sm font-bold transition shadow-sm border border-red-200">Log Out</button>
             </div>
             
             <!-- Chat Lists Directory -->
@@ -192,6 +196,33 @@
         const deleteGroupBtn = document.getElementById('delete-group-btn');
 
         // ==============================================
+        // SESSION MANAGEMENT (Auto-Login & Logout)
+        // ==============================================
+        
+        // AUTO-LOGIN: Check memory when the tab opens
+        window.onload = () => {
+            const savedUser = localStorage.getItem('chat_user');
+            const savedPass = localStorage.getItem('chat_pass');
+            
+            if (savedUser && savedPass) {
+                document.getElementById('username').value = savedUser;
+                document.getElementById('password').value = savedPass;
+                authenticate('login'); // Automatically connect!
+            }
+        };
+
+        // LOG OUT FUNCTION
+        function logout() {
+            if(confirm("Are you sure you want to log out?")) {
+                localStorage.removeItem('chat_user');
+                localStorage.removeItem('chat_pass');
+                intentionalDisconnect = true;
+                if(ws) ws.close();
+                location.reload(); // Refresh the page to show the login screen
+            }
+        }
+
+        // ==============================================
         // UX FEATURES (Password Eye & Emoji Picker)
         // ==============================================
 
@@ -281,6 +312,10 @@
                 
                 if (data.type === "auth") {
                     if (data.ok) {
+                        // SAVE CREDENTIALS: Save to browser memory for other tabs/refreshes
+                        localStorage.setItem('chat_user', user);
+                        localStorage.setItem('chat_pass', pass);
+
                         // Auth successful: Initialize UI state
                         myName = data.username;
                         document.getElementById('my-username').innerText = myName;
@@ -440,6 +475,7 @@
             }
         
         }
+
         // 2. SECURITY: XSS Sanitizer to prevent malicious script injection
         function escapeHTML(str) {
             return str.replace(/[&<>'"]/g, function(tag) {
@@ -493,10 +529,6 @@
             reader.readAsDataURL(file); 
         }
         
-
-        
-        
-
         // ==============================================
         // MESSAGE HISTORY & RENDERING
         // ==============================================
