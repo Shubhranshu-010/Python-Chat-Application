@@ -108,6 +108,14 @@ async def websocket_endpoint(websocket: WebSocket):
                 continue
             
             msg_type = d.get("type")
+            
+            # --- NEW: Catch and ignore background keep-alive pings ---
+            if msg_type == "ping":
+                continue
+
+            # --- AUTHENTICATION (Login / Register) ---
+            if msg_type == "auth" and current_user is None:
+                # ... (your existing auth code continues here) ...
 
             # --- AUTHENTICATION (Login / Register) ---
             if msg_type == "auth" and current_user is None:
