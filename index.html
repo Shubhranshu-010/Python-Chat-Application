@@ -65,13 +65,13 @@
         
         <!-- LEFT SIDEBAR: Navigation, Groups, and Direct Messages -->
         <div class="w-1/3 max-w-sm flex flex-col border-r border-gray-200">
-            <!-- Current User Profile Header (UPDATED WITH LOG OUT BUTTON) -->
+            <!-- Current User Profile Header (Includes LOG OUT BUTTON) -->
             <div class="bg-[#f0f2f5] h-16 flex items-center justify-between px-4 border-b border-gray-200 shrink-0">
                 <div class="flex items-center">
                     <div class="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center text-xl mr-3">👤</div>
                     <h2 id="my-username" class="text-lg font-bold">MyName</h2>
                 </div>
-                <!-- NEW LOG OUT BUTTON -->
+                <!-- LOG OUT BUTTON -->
                 <button onclick="logout()" class="text-red-500 hover:bg-red-100 px-3 py-1 rounded text-sm font-bold transition shadow-sm border border-red-200">Log Out</button>
             </div>
             
@@ -152,19 +152,6 @@
     </div>
 
     <!-- Group Creation Modal -->
-    <!-- Delete Options Modal -->
-    <div id="delete-modal" class="hidden fixed inset-0 z-50 bg-black/60 flex items-center justify-center fade-in">
-        <div class="bg-white p-6 rounded-lg w-80 shadow-xl text-center">
-            <h3 class="text-lg font-bold mb-4 text-gray-800">Delete Message?</h3>
-            <input type="hidden" id="delete-msg-id">
-            <div class="flex flex-col gap-2">
-                <button onclick="executeDelete('me')" class="w-full px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 font-bold transition">Delete for Me</button>
-                <button id="btn-delete-everyone" onclick="executeDelete('everyone')" class="w-full px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 font-bold transition">Delete for Everyone</button>
-                <button onclick="closeDeleteModal()" class="w-full px-4 py-2 mt-2 text-gray-500 hover:text-gray-700 transition">Cancel</button>
-            </div>
-        </div>
-    </div>
-    
     <div id="group-modal" class="hidden fixed inset-0 z-50 bg-black/60 flex items-center justify-center fade-in">
         <div class="bg-white p-6 rounded-lg w-96 shadow-xl">
             <h3 class="text-xl font-bold mb-4 text-gray-800">Create New Group</h3>
@@ -176,6 +163,19 @@
             <div class="flex justify-end gap-3">
                 <button onclick="closeGroupModal()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition font-bold">Cancel</button>
                 <button onclick="createGroup()" class="px-4 py-2 bg-[#00a884] text-white rounded hover:bg-[#008f6f] transition font-bold">Create Group</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Options Modal (Delete for Me vs Everyone) -->
+    <div id="delete-modal" class="hidden fixed inset-0 z-50 bg-black/60 flex items-center justify-center fade-in">
+        <div class="bg-white p-6 rounded-lg w-80 shadow-xl text-center">
+            <h3 class="text-lg font-bold mb-4 text-gray-800">Delete Message?</h3>
+            <input type="hidden" id="delete-msg-id">
+            <div class="flex flex-col gap-2">
+                <button onclick="executeDelete('me')" class="w-full px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 font-bold transition">Delete for Me</button>
+                <button id="btn-delete-everyone" onclick="executeDelete('everyone')" class="w-full px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 font-bold transition">Delete for Everyone</button>
+                <button onclick="closeDeleteModal()" class="w-full px-4 py-2 mt-2 text-gray-500 hover:text-gray-700 transition">Cancel</button>
             </div>
         </div>
     </div>
@@ -230,6 +230,7 @@
                 localStorage.removeItem('chat_user');
                 localStorage.removeItem('chat_pass');
                 intentionalDisconnect = true;
+                if(window.pingInterval) clearInterval(window.pingInterval);
                 if(ws) ws.close();
                 location.reload(); // Refresh the page to show the login screen
             }
@@ -318,7 +319,7 @@
             ws.onopen = () => { 
                 ws.send(JSON.stringify({ type: "auth", action: action, username: user, password: pass })); 
                 
-                // --- NEW: Heartbeat Ping to keep background tabs alive ---
+                // --- HEARTBEAT PING: Keeps sleeping background tabs alive ---
                 if (window.pingInterval) clearInterval(window.pingInterval);
                 window.pingInterval = setInterval(() => {
                     if (ws.readyState === WebSocket.OPEN) {
@@ -362,8 +363,8 @@
                 else if (data.type === "error") alert(data.message);
             };
 
-            // Auto-reload the page on unexpected connection drops
-            // --- FIXED: Silent Auto-Reconnect instead of annoying alerts ---
+            // --- SILENT AUTO-RECONNECT ---
+            // Handles browser forcibly dropping the connection when minimizing tabs
             ws.onclose = () => { 
                 if (window.pingInterval) clearInterval(window.pingInterval);
                 
@@ -381,7 +382,7 @@
                     }, 2000); // Wait 2 seconds, then stealth-reconnect
                 } 
             };
-           
+        }
 
         // ==============================================
         // GROUP MANAGEMENT
@@ -514,7 +515,7 @@
         
         }
 
-        // 2. SECURITY: XSS Sanitizer to prevent malicious script injection
+        // SECURITY: XSS Sanitizer to prevent malicious script injection
         function escapeHTML(str) {
             return str.replace(/[&<>'"]/g, function(tag) {
                 const chars = { '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' };
@@ -526,7 +527,7 @@
             let text = messageInput.value.trim();
             if (!text) return;
 
-            // 3. DATABASE OPTIMIZATION: Max 500 characters
+            // DATABASE OPTIMIZATION: Max 500 characters
             if (text.length > 500) {
                 return alert("Message is too long! Please keep it under 500 characters.");
             }
@@ -545,13 +546,14 @@
             const file = input.files[0];
             if (!file) return;
 
-            // 4. FILE SECURITY: Strict MIME type validation
+            // FILE SECURITY: Strict MIME type validation
             const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
             if (!validTypes.includes(file.type)) {
                 input.value = ""; // Clear the bad file
                 return alert("Invalid file type! Please upload only JPG, PNG, GIF, or WEBP images.");
             }
 
+            // FILE SECURITY: Size validation (Max 2MB)
             if (file.size > 2 * 1024 * 1024) { 
                 input.value = ""; 
                 return alert("Image too large! Max 2MB."); 
@@ -571,9 +573,7 @@
         // MESSAGE HISTORY & RENDERING
         // ==============================================
 
-        // ----------------------------------------------
-        // DELETE MODAL & LOGIC
-        // ----------------------------------------------
+        // --- DELETE MODAL & LOGIC ---
         
         function openDeleteModal(msgId, sender) {
             document.getElementById('delete-msg-id').value = msgId;
@@ -604,10 +604,6 @@
             }
             renderChatBox(); // Re-render immediately
         }
-
-       
-
-        
 
         function storeAndDisplayMessage(data) {
             let stamp = data.timestamp || new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
@@ -675,11 +671,9 @@
             // Green bubbles for sender, white bubbles for receiver
             const bubbleClass = isMine ? 'bg-[#d9fdd3] rounded-tl-lg rounded-tr-lg rounded-bl-lg' : 'bg-white rounded-tl-lg rounded-tr-lg rounded-br-lg shadow-sm border border-gray-100';
             
-            // Universal Delete Button: Appended to EVERY message allowing global deletion rights. 
+            // Universal Delete Button: Triggers the new Modal.
             // UX: Visible by default on mobile, visible on-hover for desktop.
-            // Universal Delete Button triggers the Modal
             const deleteHTML = msgId ? `<div onclick="openDeleteModal(${msgId}, '${sender}')" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs cursor-pointer opacity-100 md:opacity-0 md:group-hover:opacity-100 transition shadow hover:bg-red-700 z-10" title="Delete Message/Photo">✕</div>` : "";
-           
             
             // Conditional parsing: Render an <img> tag if data is an image, else render span text
             const contentHTML = text.startsWith("[IMAGE]") 
