@@ -317,6 +317,14 @@
             // Triggered when connection opens successfully
             ws.onopen = () => { 
                 ws.send(JSON.stringify({ type: "auth", action: action, username: user, password: pass })); 
+                
+                // --- NEW: Heartbeat Ping to keep background tabs alive ---
+                if (window.pingInterval) clearInterval(window.pingInterval);
+                window.pingInterval = setInterval(() => {
+                    if (ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({ type: "ping" }));
+                    }
+                }, 15000); // Send a tiny ping every 15 seconds
             };
 
             // Main event router for all incoming server messages
@@ -355,8 +363,25 @@
             };
 
             // Auto-reload the page on unexpected connection drops
-            ws.onclose = () => { if (!intentionalDisconnect) { alert("Lost connection."); location.reload(); } };
-        }
+            // --- FIXED: Silent Auto-Reconnect instead of annoying alerts ---
+            ws.onclose = () => { 
+                if (window.pingInterval) clearInterval(window.pingInterval);
+                
+                if (!intentionalDisconnect) { 
+                    console.warn("Connection lost (tab sleeping). Reconnecting silently...");
+                    setTimeout(() => {
+                        // Use stored credentials to reconnect dynamically without reloading the whole page
+                        const savedUser = localStorage.getItem('chat_user');
+                        const savedPass = localStorage.getItem('chat_pass');
+                        if (savedUser && savedPass) {
+                            document.getElementById('username').value = savedUser;
+                            document.getElementById('password').value = savedPass;
+                            authenticate('login'); // Reconnect behind the scenes
+                        }
+                    }, 2000); // Wait 2 seconds, then stealth-reconnect
+                } 
+            };
+           
 
         // ==============================================
         // GROUP MANAGEMENT
