@@ -8,25 +8,25 @@ from contextlib import closing
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 
-# ---------------------------------------------------------
+# =========================================================
 # SETUP & CONFIGURATION
-# ---------------------------------------------------------
+# =========================================================
 DB = "chat.db" # Name of our SQLite database file
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 app = FastAPI()
 
-# ---------------------------------------------------------
+# =========================================================
 # ROUTES
-# ---------------------------------------------------------
+# =========================================================
 @app.get("/")
 async def serve_frontend():
     # This acts as our web host. It serves the index.html file to anyone who visits the URL.
     with open("index.html", "r", encoding="utf-8") as f:
         return HTMLResponse(f.read())
 
-# ---------------------------------------------------------
+# =========================================================
 # DATABASE & SECURITY HELPERS
-# ---------------------------------------------------------
+# =========================================================
 def get_db():
     # Connects to SQLite and creates the tables if they don't exist yet
     conn = sqlite3.connect(DB)
@@ -35,7 +35,8 @@ def get_db():
         conn.execute("CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, sender TEXT, receiver TEXT, message TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)")
         conn.execute("CREATE TABLE IF NOT EXISTS groups (name TEXT PRIMARY KEY, created_by TEXT)")
         conn.execute("CREATE TABLE IF NOT EXISTS group_members (group_name TEXT, username TEXT)")
-        # --- NEW TABLE: Tracks 'Delete for Me' ---
+        
+        # --- NEW TABLE: Tracks 'Delete for Me' so messages can be hidden per-user ---
         conn.execute("CREATE TABLE IF NOT EXISTS deleted_messages (msg_id INTEGER, username TEXT)")
     return conn
 
@@ -55,9 +56,9 @@ def verify_password(stored_password: str, provided_password: str) -> bool:
     except ValueError:
         return False
 
-# ---------------------------------------------------------
+# =========================================================
 # WEBSOCKET CONNECTION MANAGER
-# ---------------------------------------------------------
+# =========================================================
 class ConnectionManager:
     def __init__(self):
         # Keeps track of who is currently online (Dictionary linking username -> WebSocket)
@@ -76,9 +77,9 @@ class ConnectionManager:
 manager = ConnectionManager()
 with closing(get_db()): pass # Initialize DB on startup
 
-# ---------------------------------------------------------
+# =========================================================
 # CORE WEBSOCKET ENGINE (Handles all real-time chat)
-# ---------------------------------------------------------
+# =========================================================
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
@@ -108,14 +109,11 @@ async def websocket_endpoint(websocket: WebSocket):
                 continue
             
             msg_type = d.get("type")
-            
-            # --- NEW: Catch and ignore background keep-alive pings ---
+
+            # --- HEARTBEAT PING FIX ---
+            # Catches and ignores background keep-alive pings sent by sleeping browser tabs
             if msg_type == "ping":
                 continue
-
-            # --- AUTHENTICATION (Login / Register) ---
-            if msg_type == "auth" and current_user is None:
-                # ... (your existing auth code continues here) ...
 
             # --- AUTHENTICATION (Login / Register) ---
             if msg_type == "auth" and current_user is None:
@@ -158,10 +156,8 @@ async def websocket_endpoint(websocket: WebSocket):
 
                 # If login/registration succeeds, set up their session
                 if ok:
-                    # =========================================================
-                    # GHOST CONNECTION FIX (Step 1)
-                    # =========================================================
-                    # If the user is already logged in (e.g., in a dead tab), kick out the old connection
+                    # --- GHOST CONNECTION FIX ---
+                    # If the user is already logged in (e.g., in a dead tab or duplicate tab), kick out the old connection
                     # and allow this fresh tab/connection to take over instantly.
                     if u in manager.active_connections:
                         old_ws = manager.active_connections[u]
@@ -176,7 +172,6 @@ async def websocket_endpoint(websocket: WebSocket):
                     
                     # Send success message to the frontend
                     await manager.send_to(websocket, {"type": "auth", "ok": True, "username": u, "message": msg})
-                    # =========================================================
                         
                     # Load their historical groups and messages
                     with closing(get_db()) as conn:
@@ -185,8 +180,11 @@ async def websocket_endpoint(websocket: WebSocket):
                         await manager.send_to(websocket, {"type": "groups_list", "groups": my_groups})
 
                         placeholders = ','.join('?' * len(my_groups))
+                        
+                        # --- DELETE FOR ME FIX ---
+                        # Filters out messages this specific user chose to 'Delete for Me' using the NOT IN subquery
                         query = f"SELECT id, sender, receiver, message, timestamp FROM messages WHERE (receiver = 'ALL' OR sender = ? OR receiver = ? {'OR receiver IN (' + placeholders + ')' if my_groups else ''}) AND id NOT IN (SELECT msg_id FROM deleted_messages WHERE username = ?) ORDER BY id DESC LIMIT 150"
-                        params = [u, u] + my_groups
+                        params = [u, u] + my_groups + [u]
                         rows = conn.execute(query, params).fetchall()
                     
                     for msg_id, sender, receiver, message, timestamp in reversed(rows):
@@ -275,11 +273,10 @@ async def websocket_endpoint(websocket: WebSocket):
                     if rec in manager.active_connections:
                         await manager.send_to(manager.active_connections[rec], msg_payload)
 
-            # --- DELETE MESSAGE ---
             # --- DELETE MESSAGE (Me vs Everyone) ---
             elif msg_type == "delete" and current_user:
                 msg_id = d.get("msg_id")
-                delete_type = d.get("delete_type") # Will be "me" or "everyone"
+                delete_type = d.get("delete_type") # Expects "me" or "everyone"
                 
                 with closing(get_db()) as conn:
                     cursor = conn.cursor()
@@ -290,7 +287,7 @@ async def websocket_endpoint(websocket: WebSocket):
                         del_payload = {"type": "delete", "msg_id": msg_id}
 
                         if delete_type == "me":
-                            # 1. Hide it just for this user
+                            # 1. Hide it just for this user in the tracking database
                             cursor.execute("INSERT INTO deleted_messages (msg_id, username) VALUES (?, ?)", (msg_id, current_user))
                             conn.commit()
                             # 2. Tell ONLY their UI to remove it
@@ -302,7 +299,7 @@ async def websocket_endpoint(websocket: WebSocket):
                             if sender == current_user:
                                 # 1. Nuke from database permanently
                                 cursor.execute("DELETE FROM messages WHERE id=?", (msg_id,))
-                                cursor.execute("DELETE FROM deleted_messages WHERE msg_id=?", (msg_id,)) # Cleanup
+                                cursor.execute("DELETE FROM deleted_messages WHERE msg_id=?", (msg_id,)) # Cleanup trackers
                                 conn.commit()
                                 
                                 # 2. Determine who was looking at it
@@ -320,36 +317,6 @@ async def websocket_endpoint(websocket: WebSocket):
                                 for rec in set(recipients):
                                     if rec in manager.active_connections:
                                         await manager.send_to(manager.active_connections[rec], del_payload)
-           
-                
-                with closing(get_db()) as conn:
-                    cursor = conn.cursor()
-                    # Find out who originally sent and received this specific message
-                    row = cursor.execute("SELECT sender, receiver FROM messages WHERE id=?", (msg_id,)).fetchone()
-                    
-                    if row:
-                        # 1. Delete from database permanently
-                        cursor.execute("DELETE FROM messages WHERE id=?", (msg_id,))
-                        conn.commit()
-                        del_payload = {"type": "delete", "msg_id": msg_id, "sender": row[0], "receiver": row[1]}
-                        
-                        # 2. Determine exactly who needs to be told to hide the message
-                        if row[1] == "ALL":
-                            recipients = list(manager.active_connections.keys())
-                        else:
-                            is_group = cursor.execute("SELECT 1 FROM groups WHERE name=?", (row[1],)).fetchone()
-                            if is_group:
-                                mems = cursor.execute("SELECT username FROM group_members WHERE group_name=?", (row[1],)).fetchall()
-                                recipients = [m[0] for m in mems]
-                            else:
-                                # CRITICAL FIX: Direct Message. Force the system to notify BOTH the sender and receiver
-                                # regardless of who clicked the delete button.
-                                recipients = [row[0], row[1]] 
-                        
-                        # 3. Broadcast the delete signal
-                        for rec in set(recipients):
-                            if rec in manager.active_connections:
-                                await manager.send_to(manager.active_connections[rec], del_payload)
 
             elif current_user is None:
                 await manager.send_to(websocket, {"type": "error", "message": "Please log in first."})
