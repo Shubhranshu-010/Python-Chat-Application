@@ -35,6 +35,8 @@ def get_db():
         conn.execute("CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, sender TEXT, receiver TEXT, message TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)")
         conn.execute("CREATE TABLE IF NOT EXISTS groups (name TEXT PRIMARY KEY, created_by TEXT)")
         conn.execute("CREATE TABLE IF NOT EXISTS group_members (group_name TEXT, username TEXT)")
+        # --- NEW TABLE: Tracks 'Delete for Me' ---
+        conn.execute("CREATE TABLE IF NOT EXISTS deleted_messages (msg_id INTEGER, username TEXT)")
     return conn
 
 def hash_password(password: str, salt: bytes = None) -> str:
@@ -175,7 +177,7 @@ async def websocket_endpoint(websocket: WebSocket):
                         await manager.send_to(websocket, {"type": "groups_list", "groups": my_groups})
 
                         placeholders = ','.join('?' * len(my_groups))
-                        query = f"SELECT id, sender, receiver, message, timestamp FROM messages WHERE receiver = 'ALL' OR sender = ? OR receiver = ? {'OR receiver IN (' + placeholders + ')' if my_groups else ''} ORDER BY id DESC LIMIT 150"
+                        query = f"SELECT id, sender, receiver, message, timestamp FROM messages WHERE (receiver = 'ALL' OR sender = ? OR receiver = ? {'OR receiver IN (' + placeholders + ')' if my_groups else ''}) AND id NOT IN (SELECT msg_id FROM deleted_messages WHERE username = ?) ORDER BY id DESC LIMIT 150"
                         params = [u, u] + my_groups
                         rows = conn.execute(query, params).fetchall()
                     
@@ -266,8 +268,51 @@ async def websocket_endpoint(websocket: WebSocket):
                         await manager.send_to(manager.active_connections[rec], msg_payload)
 
             # --- DELETE MESSAGE ---
+            # --- DELETE MESSAGE (Me vs Everyone) ---
             elif msg_type == "delete" and current_user:
                 msg_id = d.get("msg_id")
+                delete_type = d.get("delete_type") # Will be "me" or "everyone"
+                
+                with closing(get_db()) as conn:
+                    cursor = conn.cursor()
+                    row = cursor.execute("SELECT sender, receiver FROM messages WHERE id=?", (msg_id,)).fetchone()
+                    
+                    if row:
+                        sender, receiver = row[0], row[1]
+                        del_payload = {"type": "delete", "msg_id": msg_id}
+
+                        if delete_type == "me":
+                            # 1. Hide it just for this user
+                            cursor.execute("INSERT INTO deleted_messages (msg_id, username) VALUES (?, ?)", (msg_id, current_user))
+                            conn.commit()
+                            # 2. Tell ONLY their UI to remove it
+                            if current_user in manager.active_connections:
+                                await manager.send_to(manager.active_connections[current_user], del_payload)
+                        
+                        elif delete_type == "everyone":
+                            # Security Check: Only the original sender can delete for everyone!
+                            if sender == current_user:
+                                # 1. Nuke from database permanently
+                                cursor.execute("DELETE FROM messages WHERE id=?", (msg_id,))
+                                cursor.execute("DELETE FROM deleted_messages WHERE msg_id=?", (msg_id,)) # Cleanup
+                                conn.commit()
+                                
+                                # 2. Determine who was looking at it
+                                if receiver == "ALL":
+                                    recipients = list(manager.active_connections.keys())
+                                else:
+                                    is_group = cursor.execute("SELECT 1 FROM groups WHERE name=?", (receiver,)).fetchone()
+                                    if is_group:
+                                        mems = cursor.execute("SELECT username FROM group_members WHERE group_name=?", (receiver,)).fetchall()
+                                        recipients = [m[0] for m in mems]
+                                    else:
+                                        recipients = [sender, receiver] 
+                                
+                                # 3. Tell everyone to remove it from their screen
+                                for rec in set(recipients):
+                                    if rec in manager.active_connections:
+                                        await manager.send_to(manager.active_connections[rec], del_payload)
+           
                 
                 with closing(get_db()) as conn:
                     cursor = conn.cursor()
