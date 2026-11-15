@@ -152,6 +152,19 @@
     </div>
 
     <!-- Group Creation Modal -->
+    <!-- Delete Options Modal -->
+    <div id="delete-modal" class="hidden fixed inset-0 z-50 bg-black/60 flex items-center justify-center fade-in">
+        <div class="bg-white p-6 rounded-lg w-80 shadow-xl text-center">
+            <h3 class="text-lg font-bold mb-4 text-gray-800">Delete Message?</h3>
+            <input type="hidden" id="delete-msg-id">
+            <div class="flex flex-col gap-2">
+                <button onclick="executeDelete('me')" class="w-full px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 font-bold transition">Delete for Me</button>
+                <button id="btn-delete-everyone" onclick="executeDelete('everyone')" class="w-full px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 font-bold transition">Delete for Everyone</button>
+                <button onclick="closeDeleteModal()" class="w-full px-4 py-2 mt-2 text-gray-500 hover:text-gray-700 transition">Cancel</button>
+            </div>
+        </div>
+    </div>
+    
     <div id="group-modal" class="hidden fixed inset-0 z-50 bg-black/60 flex items-center justify-center fade-in">
         <div class="bg-white p-6 rounded-lg w-96 shadow-xl">
             <h3 class="text-xl font-bold mb-4 text-gray-800">Create New Group</h3>
@@ -533,27 +546,43 @@
         // MESSAGE HISTORY & RENDERING
         // ==============================================
 
-        function handleDeleteEvent(data) {
-            // Determine which dictionary array holds this message based on the receiver type
-            let target;
-            if (data.receiver === "ALL") target = "ALL";
-            else if (myGroups.includes(data.receiver)) target = data.receiver;
-            else target = data.sender === myName ? data.receiver : data.sender;
+        // ----------------------------------------------
+        // DELETE MODAL & LOGIC
+        // ----------------------------------------------
+        
+        function openDeleteModal(msgId, sender) {
+            document.getElementById('delete-msg-id').value = msgId;
             
-            if (chatHistory[target]) { 
-                // Remove the message from local state memory
-                chatHistory[target] = chatHistory[target].filter(msg => msg.id !== data.msg_id); 
-                
-                // If looking at the chat where the deletion occurred, force a re-render
-                if (currentChat === target) renderChatBox(); 
+            // Only allow "Delete for Everyone" if I sent the message
+            const btnEveryone = document.getElementById('btn-delete-everyone');
+            if (sender === myName) {
+                btnEveryone.classList.remove('hidden');
+            } else {
+                btnEveryone.classList.add('hidden');
             }
+            
+            document.getElementById('delete-modal').classList.remove('hidden');
         }
 
-        function deleteMessage(msgId) {
-            if(confirm("Delete this message/photo for everyone?")) {
-                ws.send(JSON.stringify({ type: "delete", msg_id: msgId }));
-            }
+        function closeDeleteModal() { document.getElementById('delete-modal').classList.add('hidden'); }
+
+        function executeDelete(type) {
+            const msgId = document.getElementById('delete-msg-id').value;
+            ws.send(JSON.stringify({ type: "delete", msg_id: parseInt(msgId), delete_type: type }));
+            closeDeleteModal();
         }
+
+        function handleDeleteEvent(data) {
+            // Instantly sweeps across all chats in memory and deletes the message globally from the UI
+            for (const room in chatHistory) {
+                chatHistory[room] = chatHistory[room].filter(msg => msg.id !== data.msg_id);
+            }
+            renderChatBox(); // Re-render immediately
+        }
+
+       
+
+        
 
         function storeAndDisplayMessage(data) {
             let stamp = data.timestamp || new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
@@ -623,7 +652,9 @@
             
             // Universal Delete Button: Appended to EVERY message allowing global deletion rights. 
             // UX: Visible by default on mobile, visible on-hover for desktop.
-            const deleteHTML = msgId ? `<div onclick="deleteMessage(${msgId})" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs cursor-pointer opacity-100 md:opacity-0 md:group-hover:opacity-100 transition shadow hover:bg-red-700 z-10" title="Delete Message/Photo">✕</div>` : "";
+            // Universal Delete Button triggers the Modal
+            const deleteHTML = msgId ? `<div onclick="openDeleteModal(${msgId}, '${sender}')" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs cursor-pointer opacity-100 md:opacity-0 md:group-hover:opacity-100 transition shadow hover:bg-red-700 z-10" title="Delete Message/Photo">✕</div>` : "";
+           
             
             // Conditional parsing: Render an <img> tag if data is an image, else render span text
             const contentHTML = text.startsWith("[IMAGE]") 
